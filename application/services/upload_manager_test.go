@@ -2,15 +2,11 @@ package services_test
 
 import (
 	"github.com/joho/godotenv"
-	uuid "github.com/satori/go.uuid"
 	"github.com/stretchr/testify/require"
 	"log"
+	"os"
 	"testing"
-	"time"
-	"videoencoder/application/repositories"
 	"videoencoder/application/services"
-	"videoencoder/domain"
-	"videoencoder/framework/database"
 )
 
 func init() {
@@ -20,22 +16,7 @@ func init() {
 	}
 }
 
-func prepare() (domain.Video, repositories.VideoRepositoryDb) {
-	db := database.NewDbTest()
-
-	defer db.Close()
-
-	video := domain.NewVideo()
-	video.ID = uuid.NewV4().String()
-	video.FilePath = "path"
-	video.CreatedAt = time.Now()
-
-	repo := repositories.VideoRepositoryDb{Db: db}
-
-	return *video, repo
-}
-
-func TestVideoServiceDownload(t *testing.T) {
+func TestVideoServiceUpload(t *testing.T) {
 	video, repo := prepare()
 	videoService := services.NewVideoService()
 	videoService.Video = &video
@@ -50,6 +31,13 @@ func TestVideoServiceDownload(t *testing.T) {
 	err = videoService.Encode()
 	require.Nil(t, err)
 
+	videoUpload := services.NewVideoUpload()
+	videoUpload.OutputBucket = "bucketName"
+	videoUpload.VideoPath = os.Getenv("localStoragePath") + "/" + video.ID
+	doneUpload := make(chan string)
+	go videoUpload.ProcessUpload(50, doneUpload)
+	result := <-doneUpload
+	require.Equal(t, result, "upload completed")
 	err = videoService.Finish()
 	require.Nil(t, err)
 }
